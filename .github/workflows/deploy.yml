@@ -85,5 +85,5 @@ jobs:
         env:
           TF_VAR_api_key: ${{ secrets.API_KEY }}
         run: |
-          terragrunt init
-          terragrunt apply -var-file=pipeline.tfvars -auto-approve
+          terragrunt init --terragrunt-non-interactive
+          terragrunt apply -var-file=pipeline.tfvars -auto-approve --terragrunt-non-interactive
