@@ -1,0 +1,89 @@
+name: Deploy Calculator Batch Serverless
+
+on:
+  push:
+    branches:
+      - develop
+      - staging
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to (dev, qa, prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+
+permissions:
+  id-token: write # Required for requesting the JWT
+  contents: read  # Required for actions/checkout
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      env_name: ${{ steps.set-env.outputs.env_name }}
+    steps:
+      - name: Determine environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "env_name=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "env_name=prod" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
+            echo "env_name=qa" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
+            echo "env_name=dev" >> $GITHUB_OUTPUT
+          else
+            echo "env_name=dev" >> $GITHUB_OUTPUT
+          fi
+
+  deploy:
+    needs: setup
+    name: Deploy to ${{ needs.setup.outputs.env_name }}
+    runs-on: ubuntu-latest
+    environment: ${{ needs.setup.outputs.env_name }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set AWS IAM Role ARN
+        id: set-role
+        run: |
+          if [ "${{ needs.setup.outputs.env_name }}" == "dev" ]; then
+            echo "ROLE_ARN=arn:aws:iam::511531632788:role/github-actions-terraform-dev-role" >> $GITHUB_ENV
+          elif [ "${{ needs.setup.outputs.env_name }}" == "qa" ]; then
+            echo "ROLE_ARN=arn:aws:iam::396502420901:role/github-actions-terraform-qa-role" >> $GITHUB_ENV
+          elif [ "${{ needs.setup.outputs.env_name }}" == "prod" ]; then
+            echo "ROLE_ARN=arn:aws:iam::623144019137:role/github-actions-terraform-prod-role" >> $GITHUB_ENV
+          fi
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: us-west-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Setup Terragrunt
+        uses: autero1/action-terragrunt@v1.3.2
+        with:
+          terragrunt_version: "0.50.0"
+
+      - name: Terragrunt Init and Apply
+        working-directory: environments/${{ needs.setup.outputs.env_name }}
+        env:
+          TF_VAR_api_key: ${{ secrets.API_KEY }}
+        run: |
+          terragrunt init
+          terragrunt apply -var-file=pipeline.tfvars -auto-approve
