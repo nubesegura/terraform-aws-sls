@@ -53,21 +53,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set AWS IAM Role ARN
-        id: set-role
-        run: |
-          if [ "${{ needs.setup.outputs.env_name }}" == "dev" ]; then
-            echo "ROLE_ARN=arn:aws:iam::511531632788:role/github-actions-terraform-dev-role" >> $GITHUB_ENV
-          elif [ "${{ needs.setup.outputs.env_name }}" == "qa" ]; then
-            echo "ROLE_ARN=arn:aws:iam::396502420901:role/github-actions-terraform-qa-role" >> $GITHUB_ENV
-          elif [ "${{ needs.setup.outputs.env_name }}" == "prod" ]; then
-            echo "ROLE_ARN=arn:aws:iam::623144019137:role/github-actions-terraform-prod-role" >> $GITHUB_ENV
-          fi
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.ROLE_ARN }}
+          role-to-assume: ${{ secrets.ROLE_ARN }}
           aws-region: us-west-1
 
       - name: Setup Terraform
@@ -84,6 +73,7 @@ jobs:
         working-directory: environments/${{ needs.setup.outputs.env_name }}
         env:
           TF_VAR_api_key: ${{ secrets.API_KEY }}
+          TERRAGRUNT_NON_INTERACTIVE: "true"
         run: |
-          terragrunt init --terragrunt-non-interactive
-          terragrunt apply -var-file=pipeline.tfvars -auto-approve --terragrunt-non-interactive
+          terragrunt init
+          terragrunt apply -var-file=pipeline.tfvars -auto-approve
