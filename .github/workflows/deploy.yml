@@ -69,11 +69,17 @@ jobs:
         with:
           terragrunt_version: "0.50.0"
 
-      - name: Terragrunt Init and Apply
+      - name: Terragrunt Init
+        working-directory: environments/${{ needs.setup.outputs.env_name }}
+        env:
+          TERRAGRUNT_NON_INTERACTIVE: "true"
+          TG_STATE_BUCKET: ${{ secrets.TG_STATE_BUCKET }}
+        run: terragrunt init
+
+      - name: Terragrunt Apply
         working-directory: environments/${{ needs.setup.outputs.env_name }}
         env:
           TF_VAR_api_key: ${{ secrets.API_KEY }}
           TERRAGRUNT_NON_INTERACTIVE: "true"
-        run: |
-          terragrunt init
-          terragrunt apply -var-file=pipeline.tfvars -auto-approve
+          TG_STATE_BUCKET: ${{ secrets.TG_STATE_BUCKET }}
+        run: terragrunt apply -var-file=pipeline.tfvars -auto-approve
