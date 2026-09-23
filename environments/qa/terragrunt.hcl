@@ -9,7 +9,7 @@ remote_state {
     if_exists = "overwrite_terragrunt"
   }
   config = {
-    bucket         = "terraform-state-qa-396502420901-us-west-1"
+    bucket         = get_env("TG_STATE_BUCKET")
     key            = "calculator-batch/terraform.tfstate"
     region         = "us-west-1"
     encrypt        = true
